@@ -19,8 +19,19 @@ namespace SDP.ViewModels
         [Display(Name = "Confirm Password")]
         [Compare("Password", ErrorMessage = "Password didn't matched with confirmed password!!!!")]
         public string ConfirmPassword { get; set; }
-        //[Required]
-        //public string Role { get; set; }
+
+        [Required]
+        
+        public string? Role { get; set; }
+
+
+        // this for the customer
+        [Required]
+        public string Address{get;set;}
+        [Required]
+        public long Contact{get;set;}
+
+        public string Name{get;set;}
 
     }
 }
