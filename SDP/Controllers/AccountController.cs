@@ -10,7 +10,7 @@ using SDP.Data;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Data.SqlClient;
 using Microsoft.AspNetCore.Http;
-
+using Data.Repository;
 namespace SDP.Controllers
 {
     public class AccountController : Controller
@@ -19,14 +19,17 @@ namespace SDP.Controllers
 
         private readonly UserManager<IdentityUser> userManager;
         private readonly SignInManager<IdentityUser> signInManager;
+        private IUnitOfWork unitOfWork;
 
         public AccountController(UserManager<IdentityUser> userManager,
                                 SignInManager<IdentityUser> signInManager, 
-                                ApplicationDbContext context)
+                                ApplicationDbContext context, 
+                                IUnitOfWork unitOfWork)
         {
             this.userManager = userManager;
             this.signInManager = signInManager;
             _context = context;
+            this.unitOfWork = unitOfWork;
 
         }
         // GET: AccountController
@@ -38,7 +41,7 @@ namespace SDP.Controllers
 
         [HttpPost]
         public async Task<IActionResult> Register(RegisterViewModel model)
-        {
+        {   
             if (ModelState.IsValid)
             {
                 var user = new IdentityUser { UserName = model.Email, Email = model.Email, EmailConfirmed= true };
@@ -46,9 +49,26 @@ namespace SDP.Controllers
 
                 if (result.Succeeded)
                 {
+                
                     await signInManager.SignInAsync(user, isPersistent: false);
-                    return RedirectToAction("index", "home");
-                    //return RedirectToAction("index1", "home");
+                    await userManager.AddToRoleAsync(user, model.Role);
+
+                    if (model.Role == "Admin"){
+                        return RedirectToAction("index", "home");
+                    }
+                    else if (model.Role == "Customer") {
+                        customer new_customer = new customer(){
+                            Name = model.Name,
+                            email = user.Email,
+                            contact = model.Contact,
+                            address = model.Address
+                        };
+                        unitOfWork.CustomerRepository.Add(new_customer);
+                        unitOfWork.Save();
+                        // adding the customer to the list  
+                        return RedirectToAction("index", "customer");
+
+                    }
                 }
 
                 foreach (var error in result.Errors)
@@ -83,7 +103,7 @@ namespace SDP.Controllers
 
                     if (result.Succeeded)
                     {
-                        //HttpContext.Session.SetString("Role", model.Role);
+                        // HttpContext.Session.SetString("Role", model.Role);
                         return RedirectToAction("index", "home");
                     }
                     else {
@@ -95,15 +115,8 @@ namespace SDP.Controllers
                     
                 }
                 else {
-                    SqlConnection cnn;
-                    String connectionString = "Server=(localdb)\\mssqllocaldb;Database=aspnet-SDP-CC54433E-7C52-476B-9D44-F833439FB6B2;Trusted_Connection=True;MultipleActiveResultSets=true";
-                    cnn = new SqlConnection(connectionString);
-                    cnn.Open();
-                    String query = "SELECT * FROM customers WHERE email = '" + model.Email + "' ";
-                    Console.WriteLine(query);
-                    SqlCommand command = new SqlCommand(query, cnn);
-                    SqlDataReader reader = command.ExecuteReader();
-                    if (reader.Read())
+                    var user = unitOfWork.UserRepository.Get(u=>u.Email == model.Email);
+                    if ( user!= null)
                     {
                         HttpContext.Session.SetString("Email", model.Email);
                         return RedirectToAction("index", "customer");
