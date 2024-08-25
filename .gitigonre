@@ -1,2 +1,2 @@
-SDP/obj/
-SDP/bin/
+SDP/obj/*
+SDP/bin/*
