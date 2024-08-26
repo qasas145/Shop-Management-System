@@ -17,15 +17,16 @@ namespace SDP.Controllers
     {
 
         private readonly ApplicationDbContext _context;
-        private readonly IHostingEnvironment hostingEnvironment;
+        private readonly IUnitOfWork unitOfWork;
+        private readonly Microsoft.AspNetCore.Hosting.IHostingEnvironment hostingEnvironment;
 
-        public ProductController(ApplicationDbContext context, IHostingEnvironment hostingEnvironment)
+        public ProductController(Microsoft.AspNetCore.Hosting.IHostingEnvironment hostingEnvironment, IUnitOfWork unitOfWork)
         {
-            _context = context;
+            this.unitOfWork = unitOfWork;
             this.hostingEnvironment = hostingEnvironment;
         }
 
-        [Authorize]
+        [Authorize(Roles ="Admin")]
         public IActionResult AddProduct()
         {
             return View();
@@ -41,6 +42,7 @@ namespace SDP.Controllers
                 string uniqueFileName = null;
                 if (model.Photo != null){
                     string uploadsFolder = Path.Combine(hostingEnvironment.WebRootPath, "img");
+                    Console.WriteLine("The upload folder is {0}", uploadsFolder);
                     uniqueFileName = Guid.NewGuid().ToString() + "_" + model.Photo.FileName;
                     string FilePath = Path.Combine(uploadsFolder, uniqueFileName);
                     model.Photo.CopyTo(new FileStream(FilePath, FileMode.Create));
@@ -55,9 +57,9 @@ namespace SDP.Controllers
                     Quantity = model.Quantity,
                     Photopath = uniqueFileName
                 };
-
-                _context.Add(newProduct);
-                _context.SaveChanges();
+                
+                unitOfWork.ProductRepository.Add(newProduct);
+                unitOfWork.Save();
                 HttpContext.Session.SetString("ProductName", model.Name);
                 ViewBag.PName = model.Name;
                 return RedirectToAction("ViewProducts", "Product");
@@ -69,7 +71,7 @@ namespace SDP.Controllers
         [HttpGet]
         public async Task<IActionResult>  UpdateProduct(int ?id)
         {
-            product pd = await _context.products.FindAsync(id);
+            product pd = unitOfWork.ProductRepository.Get(u=>u.productId == id);
             photoPath = ""+pd.Photopath;
             if (pd == null)
             {
@@ -80,27 +82,26 @@ namespace SDP.Controllers
         }
         [HttpPost]
 
-        public async Task<IActionResult> UpdateProduct(product pd)
+        public async Task<IActionResult> UpdateProduct(product pd, IFormFile? productImage)
         {
-
             if (ModelState.IsValid)
             {
                 try
                 {
-                    pd.Photopath = photoPath;
-                    Console.WriteLine(photoPath);
-                    //product newProduct = new product
-                    //{
-
-                    //    Name = pd.Name,
-                    //    Category = pd.Category,
-                    //    originalPrice = pd.originalPrice,
-                    //    MRP = pd.MRP,
-                    //    Quantity = pd.Quantity,
-                    //    Photopath = photoPath
-                    //};
-                    _context.Update(pd);
-                    await _context.SaveChangesAsync();
+                    if (productImage != null) {
+                        
+                        string uniqueFileName = null;
+                        string uploadsFolder = Path.Combine(hostingEnvironment.WebRootPath, "img");
+                        uniqueFileName = Guid.NewGuid().ToString() + "_" + productImage.FileName;
+                        string FilePath = Path.Combine(uploadsFolder, uniqueFileName);
+                        productImage.CopyTo(new FileStream(FilePath, FileMode.Create));
+                        pd.Photopath = uniqueFileName;
+                    }
+                    else {
+                        pd.Photopath = photoPath;
+                    }
+                    unitOfWork.ProductRepository.Update(pd);
+                    unitOfWork.Save();
                 }
                 catch (Exception)
                 {
@@ -108,7 +109,6 @@ namespace SDP.Controllers
                 }
                 return RedirectToAction(nameof(SearchProduct));
             }
-
             return View(pd);
         }
 
@@ -149,7 +149,7 @@ namespace SDP.Controllers
         public IActionResult SearchProduct()
         {
 
-            return View(_context.products.ToList());
+            return View(unitOfWork.ProductRepository.GetAll());
         }
 
 
