@@ -119,7 +119,7 @@ namespace SDP.Controllers
             {
                 return NotFound();
             }
-            product pd = await _context.products.FindAsync(id);
+            product pd = unitOfWork.ProductRepository.Get(u=>u.productId == id);
             if (pd == null)
             {
                 return NotFound();
@@ -130,9 +130,9 @@ namespace SDP.Controllers
         [HttpPost]
         public async Task<IActionResult> DeleteProduct(int id)
         {
-            var pd = await _context.products.FindAsync(id);
-            _context.products.Remove(pd);
-            await _context.SaveChangesAsync();
+            var pd = unitOfWork.ProductRepository.Get(u=>u.productId == id);
+            unitOfWork.ProductRepository.Remove(pd);
+            unitOfWork.Save();
             return RedirectToAction(nameof(SearchProduct));
         }
         
@@ -140,7 +140,7 @@ namespace SDP.Controllers
         {
             ViewBag.Email = null;
             ViewBag.Email = (HttpContext.Session.GetString("Email"));
-            var productsList = _context.products.ToList();
+            var productsList = unitOfWork.ProductRepository.GetAll();
             ViewBag.ProductName = (HttpContext.Session.GetString("ProductName"));
             return View(productsList);
         }
