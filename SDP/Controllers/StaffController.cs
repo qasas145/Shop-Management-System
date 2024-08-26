@@ -11,12 +11,11 @@ namespace SDP.Controllers
 {
     public class StaffController : Controller
     {
-        private readonly ApplicationDbContext _context;
-        private readonly IHostingEnvironment hostingEnvironment;
-
-        public StaffController(ApplicationDbContext context, IHostingEnvironment hostingEnvironment)
+        private readonly Microsoft.AspNetCore.Hosting.IHostingEnvironment hostingEnvironment;
+        private readonly IUnitOfWork unitOfWork;
+        public StaffController(ApplicationDbContext context, Microsoft.AspNetCore.Hosting.IHostingEnvironment hostingEnvironment, IUnitOfWork unitOfWork)
         {
-            _context = context;
+            this.unitOfWork = unitOfWork;
             this.hostingEnvironment = hostingEnvironment;
         }
 
@@ -43,8 +42,8 @@ namespace SDP.Controllers
                     role = model.role
                 };
 
-                _context.Add(st);
-                _context.SaveChanges();
+                unitOfWork.StaffRepository.Add(st);
+                unitOfWork.Save();
                 return RedirectToAction("ViewStaff","Staff");
             }
             return View();
@@ -52,7 +51,7 @@ namespace SDP.Controllers
         [HttpGet]
         public async Task<IActionResult> UpdateStaff(int? id)
         {
-            staff st = await _context.staffs.FindAsync(id);
+            staff st = unitOfWork.StaffRepository.Get(u=>u.staffId == id);
 
             if (st == null)
             {
@@ -70,8 +69,8 @@ namespace SDP.Controllers
             {
                 try
                 {
-                    _context.Update(st);
-                    await _context.SaveChangesAsync();
+                    unitOfWork.StaffRepository.Update(st);
+                    unitOfWork.Save();
                 }
                 catch (Exception)
                 {
@@ -90,7 +89,7 @@ namespace SDP.Controllers
             {
                 return NotFound();
             }
-            staff st = await _context.staffs.FindAsync(id);
+            staff st = unitOfWork.StaffRepository.Get(u=>u.staffId == id);
             if (st == null)
             {
                 return NotFound();
@@ -101,15 +100,15 @@ namespace SDP.Controllers
         [HttpPost]
         public async Task<IActionResult> DeleteStaff(int id)
         {
-            var st = await _context.staffs.FindAsync(id);
-            _context.staffs.Remove(st);
-            await _context.SaveChangesAsync();
+            var st = unitOfWork.StaffRepository.Get(u=>u.staffId == id);
+            unitOfWork.StaffRepository.Remove(st);
+            unitOfWork.Save();
             return RedirectToAction(nameof(ViewStaff));
         }
 
         public IActionResult ViewStaff()
         {
-            return View(_context.staffs.ToList());
+            return View(unitOfWork.StaffRepository.GetAll());
         }
     }
 }
