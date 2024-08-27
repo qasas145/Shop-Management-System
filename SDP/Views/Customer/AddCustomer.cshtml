@@ -22,7 +22,7 @@
                             <div asp-validation-summary="All" class="text-danger"></div>
                             <div class="form-group">
                                 <label asp-for="Name">Customer Name</label>
-                                <input type="text" class="form-control" asp-for="Name" aria-describedby="namelHelp" placeholder="Enter Customer Name" required>
+                                <input type="text" class="form-control" asp-for="Name" aria-describedby="namelHelp" placeholder="Enter Customer Name" >
                                 <span asp-validation-for="Name" class="text-danger"></span>
                                 <small id="nameHelp" class="form-text text-muted"><i class="fa fa-lock mr-2"></i>Be specific.</small>
                             </div>
@@ -33,12 +33,12 @@
                             </div>
                             <div class="form-group">
                                 <label asp-for="contact">Contact Number</label>
-                                <input type="number" pattern="[0-9]{11}" class="form-control" asp-for="contact" placeholder="Contact Number" required>
+                                <input type="number" pattern="[0-9]{11}" class="form-control" asp-for="contact" placeholder="Contact Number" >
                                 <span asp-validation-for="contact" class="text-danger"></span>
                             </div>
                             <div class="form-group">
                                 <label asp-for="address">Address</label>
-                                <input type="text" class="form-control" asp-for="address" placeholder="Address" required>
+                                <input type="text" class="form-control" asp-for="address" placeholder="Address" >
                                 <span asp-validation-for="address" class="text-danger"></span>
                             </div>
 
