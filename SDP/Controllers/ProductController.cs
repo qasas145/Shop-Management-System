@@ -42,7 +42,6 @@ namespace SDP.Controllers
                 string uniqueFileName = null;
                 if (model.Photo != null){
                     string uploadsFolder = Path.Combine(hostingEnvironment.WebRootPath, "img");
-                    Console.WriteLine("The upload folder is {0}", uploadsFolder);
                     uniqueFileName = Guid.NewGuid().ToString() + "_" + model.Photo.FileName;
                     string FilePath = Path.Combine(uploadsFolder, uniqueFileName);
                     model.Photo.CopyTo(new FileStream(FilePath, FileMode.Create));
