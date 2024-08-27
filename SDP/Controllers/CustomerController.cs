@@ -16,26 +16,28 @@ using System.Data;
 using System.Net.Mail;
 using System.Net;
 using System.Text;
+using Data.Repository;
 
 namespace SDP.Controllers
 {
     public class CustomerController : Controller
     {
 
-
         private readonly ApplicationDbContext _context;
+        private IUnitOfWork unitOfWork;
 
-        private readonly IHostingEnvironment hostingEnvironment;
+        private readonly Microsoft.AspNetCore.Hosting.IHostingEnvironment hostingEnvironment;
         static List<int> cartList = new List<int>();
          
         int qty;
         int pro_id;
         static string Email = "";
 
-        public CustomerController(ApplicationDbContext context, IHostingEnvironment hostingEnvironment)
+        public CustomerController(ApplicationDbContext context, Microsoft.AspNetCore.Hosting.IHostingEnvironment hostingEnvironment, IUnitOfWork _unitOfWork)
         {
             _context = context;
             this.hostingEnvironment = hostingEnvironment;
+            this.unitOfWork = _unitOfWork;
             //cartList.Add(0);
         }
 
@@ -55,20 +57,25 @@ namespace SDP.Controllers
         public IActionResult Index()
         {
             ViewBag.Email = null;
-            //Console.WriteLine(HttpContext.Session.GetString("Email"));
-            ViewBag.Email = (HttpContext.Session.GetString("Email"));
+            ViewBag.Email = (HttpContext.Session.GetString("Cus_Email"));
             
 
             return View();
         }
 
-        
-
         [Authorize]
 
         public IActionResult PurchaseProduct()
         {
-            var productsList = _context.products.ToList();
+            
+            if (string.IsNullOrEmpty(Email)) {
+                return Redirect(nameof(AddCustomer));
+            }
+           
+           
+            var productsList = unitOfWork.ProductRepository.GetAll();
+            // var productsList = _context.products.ToList(); // old way 
+
             return View(productsList);
         }
         [HttpGet]
@@ -76,7 +83,9 @@ namespace SDP.Controllers
 
         public async Task<IActionResult> AddToCart(int ?id)
         {
-            product pd = await _context.products.FindAsync(id);
+           
+            product pd = unitOfWork.ProductRepository.Get(u =>u.productId == id);
+           
             cartList.Add((int)id);
             //Console.WriteLine(cartList.Count);
             pd.Name = pd.Name;
@@ -85,13 +94,16 @@ namespace SDP.Controllers
             pd.Photopath = pd.Photopath;
             pd.originalPrice = pd.originalPrice;
             pd.Quantity = pd.Quantity - 1;
-            _context.Update(pd);
-            await _context.SaveChangesAsync();
+            unitOfWork.ProductRepository.Update(pd);
+            unitOfWork.Save();
             
+           
             foreach (int x in cartList)
             {
-                Console.WriteLine(x);
+               
             }
+           
+
             //Console.WriteLine(cartList.Count);
             return RedirectToAction("PurchaseProduct", "Customer");
             //PurchaseProduct pp = new PurchaseProduct()
@@ -102,7 +114,7 @@ namespace SDP.Controllers
             //};
 
             //SqlConnection cnn;
-            //String connectionString = "Server=(localdb)\\mssqllocaldb;Database=aspnet-SDP-CC54433E-7C52-476B-9D44-F833439FB6B2;Trusted_Connection=True;MultipleActiveResultSets=true";
+            //String connectionString = "Server=localhost,1433;Database=Sayed;User Id= SA;Password=Hamada1020;TrustServerCertificate=True";
             //cnn = new SqlConnection(connectionString);
             //cnn.Open();
             //System.Diagnostics.Debug.WriteLine("hello");
@@ -132,10 +144,6 @@ namespace SDP.Controllers
             //    ViewBag.ErrorMessage = "Not enough Quantity";
             //}
             //int i;
-            
-
-
-            
         }
 
         // [Authorize]
@@ -152,22 +160,29 @@ namespace SDP.Controllers
         [HttpPost]
         public IActionResult AddCustomer(CustomerViewModel model)
         {
-            if (ModelState.IsValid) { 
-                    customer newcustomer = new customer
-                    {
-                        Name = model.Name,
-                        email = model.email,
-                        contact = model.contact,
-                        address = model.address
-                    };
-                     Email = model.email;
+            if (!string.IsNullOrEmpty(model.email)) {
+                customer ct = unitOfWork.CustomerRepository.Get(c=>c.email == model.email);
+                if (ct != null) {
                     HttpContext.Session.SetString("Cus_Email", model.email);
-                // Console.WriteLine(Email);
-                _context.Add(newcustomer);
-                    _context.SaveChanges();
-
-
+                    Email = model.email;
                     return RedirectToAction("PurchaseProduct","Customer");
+                }
+            }
+            if (ModelState.IsValid) { 
+                customer newcustomer = new customer
+                {
+                    Name = model.Name,
+                    email = model.email,
+                    contact = model.contact,
+                    address = model.address
+                };
+                Email = model.email;
+                HttpContext.Session.SetString("Cus_Email", model.email);
+                unitOfWork.CustomerRepository.Add(newcustomer);
+                unitOfWork.Save();
+
+
+                return RedirectToAction("PurchaseProduct","Customer");
             }
             return View();
         }
@@ -176,27 +191,24 @@ namespace SDP.Controllers
         public async Task<IActionResult> GenerateInvoice()
         {
             int i;
-            Console.WriteLine(cartList.Count);
             float amount = 0;
             int total_qauntity = 0;
-            int customerId = 0;
-            SqlConnection cnn;
-            String connectionString = "Server=(localdb)\\mssqllocaldb;Database=aspnet-SDP-CC54433E-7C52-476B-9D44-F833439FB6B2;Trusted_Connection=True;MultipleActiveResultSets=true";
-            cnn = new SqlConnection(connectionString);
-            cnn.Open();
-            String query = "SELECT * FROM customers WHERE email = '" + Email + "' ";
-            Console.WriteLine(query);
-            SqlCommand command = new SqlCommand(query, cnn);
-            SqlDataReader reader = command.ExecuteReader();
-            while (reader.Read())
-            {
-                customerId = Int32.Parse((reader.GetValue(0)).ToString());
-                //Console.WriteLine(reader.GetValue(0));
+            if (string.IsNullOrEmpty(Email)) {
+                    
+                Email = HttpContext.Session.GetString("Cus_Email");
+
             }
+            
+
+            int customerId = unitOfWork.CustomerRepository.Get(u=>u.email == Email).customerId;
+           
             for (i = 0; i < cartList.Count; i++)
             {
                 Console.WriteLine(cartList[i]);
             }
+           
+
+            // getting the no of units of the product 
             int[] fr1 = new int[100];
             int length = cartList.Count;
             for (i = 0; i < length; i++) {
@@ -219,7 +231,7 @@ namespace SDP.Controllers
                     fr1[i] = ctr;
                 }
             }
-            customer ct = await _context.customers.FindAsync(customerId);
+            customer ct = unitOfWork.CustomerRepository.Get(u=>u.customerId == customerId);
 
             float total_amount = 0;
             for (i = 0; i < length; i++)
@@ -229,7 +241,7 @@ namespace SDP.Controllers
                 if (fr1[i] != 0)
                 {
                     //Console.Write("{0} occurs {1} times\n", cartList[i], fr1[i]);
-                    product pd = await _context.products.FindAsync(cartList[i]);
+                    product pd = unitOfWork.ProductRepository.Get(u=>u.productId == cartList[i]);
                     pName = "" + pd.Name;
                     amount = (pd.MRP) * (fr1[i]);
                     quantity = fr1[i];
@@ -240,21 +252,14 @@ namespace SDP.Controllers
                         Quantity = quantity,
                         Price = amount
                     };
-                    _context.Update(customerObj);
-                    await _context.SaveChangesAsync();
+                    unitOfWork.OrderRepository.Update(customerObj);
+                    unitOfWork.Save();
                     total_qauntity = total_qauntity + fr1[i];
                     total_amount = total_amount + amount;
 
                 }
             }
-
-            //Order orderObj = await _context.order.FindAsync(customerId);
-            //Console.WriteLine(orderObj);
-            //query = "SELECT * FROM order WHERE customerId = '" + customerId + "'";
-            //Console.WriteLine(query);
-            //command = new SqlCommand(query, cnn);
-            //reader = command.ExecuteReader();
-            var orderList = _context.order.ToList();
+            var orderList = unitOfWork.OrderRepository.GetAll(u=>u.customerId == customerId);
 
             try
             {
@@ -262,7 +267,6 @@ namespace SDP.Controllers
                 ViewBag.total_quantity = total_qauntity;
                 ViewBag.customer_name = ct.Name;
                 ViewBag.customer_Id = customerId;
-                cnn.Close();
                 return View(orderList);
             }
             catch (Exception e) {
@@ -273,35 +277,10 @@ namespace SDP.Controllers
         public async Task<IActionResult> Profile()
         {
             ViewBag.Email = null;
-            ViewBag.Email = (HttpContext.Session.GetString("Email"));
-            SqlConnection cnn;
-            String connectionString = "Server=(localdb)\\mssqllocaldb;Database=aspnet-SDP-CC54433E-7C52-476B-9D44-F833439FB6B2;Trusted_Connection=True;MultipleActiveResultSets=true";
-            cnn = new SqlConnection(connectionString);
-            cnn.Open();
-            String query = "SELECT customerId FROM customers WHERE email = '" + ViewBag.Email + "' ";
-            Console.WriteLine(query);
-            SqlCommand command = new SqlCommand(query, cnn);
-            SqlDataReader reader = command.ExecuteReader();
-            int customerId = 0;
-            while (reader.Read()) {
-                customerId = Int32.Parse((reader.GetValue(0)).ToString());
-            }
-            //customer pd = await _context.customers.FindAsync(customerId);
-            //cnn.Close();
-            //connectionString = "Server=(localdb)\\mssqllocaldb;Database=aspnet-SDP-CC54433E-7C52-476B-9D44-F833439FB6B2;Trusted_Connection=True;MultipleActiveResultSets=true";
-            //cnn = new SqlConnection(connectionString);
-            //cnn.Open();
-            //query = "SELECT OrderId FROM Order WHERE customerId = '" + customerId + "' ";
-            //Console.WriteLine(query);
-            //command = new SqlCommand(query, cnn);
-            //reader = command.ExecuteReader();
-            //int orderId = 0;
-            //while (reader.Read())
-            //{
-            //    orderId = Int32.Parse((reader.GetValue(0)).ToString());
-            //}
-            //Order od = await _context.order.FindAsync(orderId);
-            var orderList = _context.order.ToList();
+            ViewBag.Email = (HttpContext.Session.GetString("Cus_Email"));
+            string email = ViewBag.Email;
+            int customerId = unitOfWork.CustomerRepository.Get(u=>u.email == email).customerId;
+            var orderList = unitOfWork.OrderRepository.GetAll(o=>o.customerId == customerId);
             ViewBag.customerId = customerId;
             return View(orderList);
         }
@@ -368,11 +347,6 @@ namespace SDP.Controllers
                 throw ex;
             }
             return RedirectToAction("index", "home");
-
-
-
-
-            
         }
 
     }
