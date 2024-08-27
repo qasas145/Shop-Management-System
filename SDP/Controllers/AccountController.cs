@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Data.SqlClient;
 using Microsoft.AspNetCore.Http;
 using Data.Repository;
+using Microsoft.AspNetCore.Http.HttpResults;
 namespace SDP.Controllers
 {
     public class AccountController : Controller
@@ -51,24 +52,9 @@ namespace SDP.Controllers
                 {
                 
                     await signInManager.SignInAsync(user, isPersistent: false);
-                    await userManager.AddToRoleAsync(user, model.Role);
-
-                    if (model.Role == "Admin"){
-                        return RedirectToAction("index", "home");
-                    }
-                    else if (model.Role == "Customer") {
-                        customer new_customer = new customer(){
-                            Name = model.Name,
-                            email = user.Email,
-                            contact = model.Contact,
-                            address = model.Address
-                        };
-                        unitOfWork.CustomerRepository.Add(new_customer);
-                        unitOfWork.Save();
-                        // adding the customer to the list  
-                        return RedirectToAction("index", "customer");
-
-                    }
+                    await userManager.AddToRoleAsync(user, "Admin");
+                    HttpContext.Session.SetString("Email", model.Email);
+                    return RedirectToAction("index", "home");
                 }
 
                 foreach (var error in result.Errors)
@@ -104,6 +90,7 @@ namespace SDP.Controllers
                     if (result.Succeeded)
                     {
                         // HttpContext.Session.SetString("Role", model.Role);
+                        HttpContext.Session.SetString("Email", model.Email);
                         return RedirectToAction("index", "home");
                     }
                     else {
@@ -115,16 +102,19 @@ namespace SDP.Controllers
                     
                 }
                 else {
-                    var user = unitOfWork.UserRepository.Get(u=>u.Email == model.Email);
+                    var user = unitOfWork.CustomerRepository.Get(u=>u.email == model.Email);
+                    
                     if ( user!= null)
                     {
                         HttpContext.Session.SetString("Email", model.Email);
+                        HttpContext.Session.SetString("Cus_Email", model.Email);
                         return RedirectToAction("index", "customer");
 
                     }
                     else
                     {
                         HttpContext.Session.Remove("Email");
+                        HttpContext.Session.Remove("Cus_Email");
                         ViewBag.Message = "Customer not Exist!!!";
                         return View();
 
@@ -142,7 +132,12 @@ namespace SDP.Controllers
 
             await signInManager.SignOutAsync();
             HttpContext.Session.Remove("Email");
+            HttpContext.Session.Remove("Cus_Email");
             return RedirectToAction("index", "customer");
+        }
+
+        public IActionResult AccessDenied() {
+            return NotFound();
         }
 
     }
